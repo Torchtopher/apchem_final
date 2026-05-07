@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# Local browser test artifacts
+.playwright-mcp/
