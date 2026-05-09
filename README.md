@@ -17,3 +17,29 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Deploy
+
+The sync script builds the Vite app and uploads the generated `dist/` files to
+the server with `rsync`:
+
+```bash
+./scripts/sync.sh
+```
+
+Defaults:
+
+```bash
+REMOTE_HOST=root@104.236.37.133
+REMOTE_PATH=/var/www/html/apchem
+```
+
+To publish into a specific web root, override `REMOTE_PATH`:
+
+```bash
+REMOTE_PATH=/var/www/html/some-other-path ./scripts/sync.sh
+```
+
+
+## Useful acid base reference for making diagram
+https://www.iq.usp.br/gutz/Curtipot_.html

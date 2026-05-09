@@ -14,6 +14,16 @@ import {
 type Choice = "lower" | "higher" | "same" | "";
 type DataChoice = "none" | "pka" | "pkb" | "";
 type Route = "shortcut" | "long" | "unset";
+type IceField =
+  | "initialHa"
+  | "initialH"
+  | "initialA"
+  | "changeHa"
+  | "changeH"
+  | "changeA"
+  | "equilibriumHa"
+  | "equilibriumH"
+  | "equilibriumA";
 
 type BufferState = {
   py: number;
@@ -930,6 +940,78 @@ function MoleLedger({ revealed }: { revealed: boolean }) {
   );
 }
 
+function InteractiveIceTable({
+  values,
+  checked,
+  onChange,
+}: {
+  values: Record<IceField, string>;
+  checked: boolean;
+  onChange: (field: IceField, value: string) => void;
+}) {
+  const rows: Array<[string, IceField, IceField, IceField]> = [
+    ["Initial", "initialHa", "initialH", "initialA"],
+    ["Change", "changeHa", "changeH", "changeA"],
+    ["Equil.", "equilibriumHa", "equilibriumH", "equilibriumA"],
+  ];
+
+  return (
+    <div className="ledger interactive-ice" aria-label="Editable ICE table">
+      <strong>HA ⇌ H+ + A-</strong>
+      <div className="ice-grid">
+        <span />
+        <span>HA</span>
+        <span>H+</span>
+        <span>A-</span>
+        {rows.map(([label, haField, hField, aField]) => (
+          <FragmentedIceRow
+            key={label}
+            label={label}
+            fields={[haField, hField, aField]}
+            values={values}
+            checked={checked}
+            onChange={onChange}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FragmentedIceRow({
+  label,
+  fields,
+  values,
+  checked,
+  onChange,
+}: {
+  label: string;
+  fields: [IceField, IceField, IceField];
+  values: Record<IceField, string>;
+  checked: boolean;
+  onChange: (field: IceField, value: string) => void;
+}) {
+  return (
+    <>
+      <span>{label}</span>
+      {fields.map((field) => {
+        const correct = iceFieldIsCorrect(field, values[field]);
+        return (
+          <input
+            key={field}
+            className={checked ? (correct ? "correct" : "incorrect") : ""}
+            value={values[field]}
+            onChange={(event) => onChange(field, event.target.value)}
+            aria-label={`${label} ${field}`}
+            autoCapitalize="none"
+            spellCheck={false}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function RatioComparison({ route }: { route: Route }) {
   return (
     <div className="ratio-panel">
@@ -1097,18 +1179,83 @@ const aceticPka = -Math.log10(aceticKa);
 const weakAcidH = (-aceticKa + Math.sqrt(aceticKa * aceticKa + 4 * aceticKa * 0.1)) / 2;
 const weakAcidPH = -Math.log10(weakAcidH);
 const weakAcidPercent = (weakAcidH / 0.1) * 100;
+const weakAcidCalculationSteps = [
+  "Substitute the ICE row into Ka: Ka = x^2 / (0.100 - x).",
+  "Rearrange so the equation equals zero: x^2 + Ka*x - Ka(0.100) = 0.",
+  "Solve the quadratic and keep the positive root because x is [H+].",
+  "Convert concentration to pH with pH = -log[H+].",
+];
+const correctWeakAcidCalculationOrder = [0, 1, 2, 3];
+const emptyIceTable: Record<IceField, string> = {
+  initialHa: "",
+  initialH: "",
+  initialA: "",
+  changeHa: "",
+  changeH: "",
+  changeA: "",
+  equilibriumHa: "",
+  equilibriumH: "",
+  equilibriumA: "",
+};
+
+function normalizeIceValue(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s/g, "")
+    .replace(/−/g, "-");
+}
+
+function iceFieldIsCorrect(field: IceField, value: string) {
+  const normalized = normalizeIceValue(value);
+  const acceptable: Record<IceField, string[]> = {
+    initialHa: ["0.100", ".100", "0.1"],
+    initialH: ["0", "0.000"],
+    initialA: ["0", "0.000"],
+    changeHa: ["-x"],
+    changeH: ["+x", "x"],
+    changeA: ["+x", "x"],
+    equilibriumHa: ["0.100-x", ".100-x", "0.1-x"],
+    equilibriumH: ["x"],
+    equilibriumA: ["x"],
+  };
+
+  return acceptable[field].includes(normalized);
+}
+
+function iceTableIsCorrect(values: Record<IceField, string>) {
+  return (Object.keys(values) as IceField[]).every((field) =>
+    iceFieldIsCorrect(field, values[field]),
+  );
+}
+
+function orderMatches(selected: number[], correct: number[]) {
+  return selected.every((step, index) => step === correct[index]);
+}
 
 function WeakAcidProblem() {
   const guideRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState(0);
   const [prediction, setPrediction] = useState("");
   const [breakApart, setBreakApart] = useState("");
+  const [predictionChecked, setPredictionChecked] = useState(false);
   const [largeSpecies, setLargeSpecies] = useState("");
-  const [iceReady, setIceReady] = useState(false);
+  const [largeSpeciesChecked, setLargeSpeciesChecked] = useState(false);
+  const [iceValues, setIceValues] =
+    useState<Record<IceField, string>>(emptyIceTable);
+  const [iceChecked, setIceChecked] = useState(false);
+  const [calculationOrder, setCalculationOrder] = useState<number[]>([]);
+  const [calculationOrderChecked, setCalculationOrderChecked] = useState(false);
   const [answer, setAnswer] = useState("");
   const [revealed, setRevealed] = useState(false);
 
   const progress = Math.round((phase / 3) * 100);
+  const predictionCorrect =
+    prediction === "closer to 1" && breakApart === "No, only partly";
+  const iceCorrect = iceTableIsCorrect(iceValues);
+  const calculationOrderCorrect =
+    calculationOrder.length === correctWeakAcidCalculationOrder.length &&
+    orderMatches(calculationOrder, correctWeakAcidCalculationOrder);
   const answerCorrect = Math.abs(Number(answer) - weakAcidPH) <= 0.04;
 
   useEffect(() => {
@@ -1119,10 +1266,26 @@ function WeakAcidProblem() {
     setPhase(0);
     setPrediction("");
     setBreakApart("");
+    setPredictionChecked(false);
     setLargeSpecies("");
-    setIceReady(false);
+    setLargeSpeciesChecked(false);
+    setIceValues(emptyIceTable);
+    setIceChecked(false);
+    setCalculationOrder([]);
+    setCalculationOrderChecked(false);
     setAnswer("");
     setRevealed(false);
+  }
+
+  function updateIceField(field: IceField, value: string) {
+    setIceValues((current) => ({ ...current, [field]: value }));
+    setIceChecked(false);
+  }
+
+  function chooseCalculationStep(index: number) {
+    if (calculationOrder.includes(index)) return;
+    setCalculationOrder((current) => [...current, index]);
+    setCalculationOrderChecked(false);
   }
 
   return (
@@ -1182,7 +1345,10 @@ function WeakAcidProblem() {
                       key={choice}
                       aria-pressed={prediction === choice}
                       className={prediction === choice ? "selected" : ""}
-                      onClick={() => setPrediction(choice)}
+                      onClick={() => {
+                        setPrediction(choice);
+                        setPredictionChecked(false);
+                      }}
                     >
                       {choice}
                     </button>
@@ -1197,20 +1363,48 @@ function WeakAcidProblem() {
                       key={choice}
                       aria-pressed={breakApart === choice}
                       className={breakApart === choice ? "selected" : ""}
-                      onClick={() => setBreakApart(choice)}
+                      onClick={() => {
+                        setBreakApart(choice);
+                        setPredictionChecked(false);
+                      }}
                     >
                       {choice}
                     </button>
                   ))}
                 </div>
               </fieldset>
-              <button
-                className="primary-action"
-                disabled={!prediction || !breakApart}
-                onClick={() => setPhase(1)}
-              >
-                Show equilibrium <ChevronRight size={18} />
-              </button>
+              {predictionChecked && (
+                <div
+                  className={`feedback ${predictionCorrect ? "success" : "warning"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {predictionCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+                  <p>
+                    {predictionCorrect
+                      ? "Correct. A 0.100 M weak acid is acidic, but only a small fraction ionizes."
+                      : prediction !== "closer to 1"
+                        ? "Hint: even a weak acid solution is still acidic. Its pH is below 7, and this one is much closer to 1 than to neutral."
+                        : "Hint: weak acids establish equilibrium. Most HA remains intact instead of fully becoming H+ and A-."}
+                  </p>
+                </div>
+              )}
+              <div className="button-row">
+                <button
+                  className="secondary-action"
+                  disabled={!prediction || !breakApart}
+                  onClick={() => setPredictionChecked(true)}
+                >
+                  Check prediction
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={!predictionChecked || !predictionCorrect}
+                  onClick={() => setPhase(1)}
+                >
+                  Show equilibrium <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1231,103 +1425,221 @@ function WeakAcidProblem() {
                       key={choice}
                       aria-pressed={largeSpecies === choice}
                       className={largeSpecies === choice ? "selected" : ""}
-                      onClick={() => setLargeSpecies(choice)}
+                      onClick={() => {
+                        setLargeSpecies(choice);
+                        setLargeSpeciesChecked(false);
+                      }}
                     >
                       {choice}
                     </button>
                   ))}
                 </div>
               </fieldset>
-              {largeSpecies && largeSpecies !== "HA" && (
-                <div className="feedback warning">
-                  <Lightbulb size={18} />
-                  <p>Weak acid means the original HA remains the dominant species.</p>
+              {largeSpeciesChecked && (
+                <div
+                  className={`feedback ${largeSpecies === "HA" ? "success" : "warning"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {largeSpecies === "HA" ? <Check size={18} /> : <Lightbulb size={18} />}
+                  <p>
+                    {largeSpecies === "HA"
+                      ? "Correct. The equilibrium lies mostly on the reactant side."
+                      : "Hint: weak acid means only a small fraction ionizes, so the original HA remains the dominant species."}
+                  </p>
                 </div>
               )}
-              <button
-                className="primary-action"
-                disabled={largeSpecies !== "HA"}
-                onClick={() => setPhase(2)}
-              >
-                Build ICE table <ChevronRight size={18} />
-              </button>
+              <div className="button-row">
+                <button
+                  className="secondary-action"
+                  disabled={!largeSpecies}
+                  onClick={() => setLargeSpeciesChecked(true)}
+                >
+                  Check species
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={!largeSpeciesChecked || largeSpecies !== "HA"}
+                  onClick={() => setPhase(2)}
+                >
+                  Build ICE table <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           )}
 
           {phase === 2 && (
             <div className="step-card">
               <p className="eyebrow">ICE table</p>
-              <h3>Use x for the small amount that ionizes.</h3>
-              <div className="ledger">
-                <strong>HA ⇌ H+ + A-</strong>
-                <div className="ledger-grid">
-                  <span />
-                  <span>HA</span>
-                  <span>H+</span>
-                  <span>A-</span>
-                  <span>Initial</span>
-                  <code>0.100</code>
-                  <code>0</code>
-                  <code>0</code>
-                  <span>Change</span>
-                  <code>-x</code>
-                  <code>+x</code>
-                  <code>+x</code>
-                  <span>Equil.</span>
-                  <code>0.100 - x</code>
-                  <code>x</code>
-                  <code>x</code>
-                </div>
-              </div>
-              <p className="math-panel">
-                <code>Ka = x^2 / (0.100 - x)</code>. Because Ka is small,{" "}
-                <code>x</code> is small compared with <code>0.100</code>, so we
-                can estimate <code>x = sqrt(Ka * 0.100)</code>.
+              <h3>Use x for the amount that ionizes.</h3>
+              <p>
+                Fill each concentration box for <code>HA ⇌ H+ + A-</code>.
+                Use <code>x</code> for the amount that ionizes.
               </p>
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  checked={iceReady}
-                  onChange={(event) => setIceReady(event.target.checked)}
-                />
-                I see why x is small: most HA stays as HA.
-              </label>
-              <button
-                className="primary-action"
-                disabled={!iceReady}
-                onClick={() => setPhase(3)}
-              >
-                Calculate pH <ChevronRight size={18} />
-              </button>
+              <InteractiveIceTable
+                values={iceValues}
+                checked={iceChecked}
+                onChange={updateIceField}
+              />
+              {iceChecked && (
+                <div
+                  className={`feedback ${iceCorrect ? "success" : "warning"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {iceCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+                  <p>
+                    {iceCorrect
+                      ? "Correct. The product concentrations are both x, and HA loses x."
+                      : "Hint: start with 0.100 M HA and no ions. Ionizing one HA subtracts x from HA and adds x to both products."}
+                  </p>
+                </div>
+              )}
+              {iceCorrect && (
+                <p className="math-panel">
+                  <code>Ka = x^2 / (0.100 - x)</code>. Rearranged as a
+                  quadratic: <code>x^2 + Ka*x - Ka(0.100) = 0</code>. Use the
+                  positive root for <code>[H+]</code>.
+                </p>
+              )}
+              <div className="button-row">
+                <button
+                  className="secondary-action"
+                  onClick={() => setIceChecked(true)}
+                >
+                  Check ICE table
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={!iceChecked || !iceCorrect}
+                  onClick={() => setPhase(3)}
+                >
+                  Calculate pH <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           )}
 
           {phase === 3 && (
             <div className="step-card">
               <p className="eyebrow">Answer</p>
-              <h3>Enter the pH.</h3>
-              <p className="math-panel">
-                <code>[H+] = x ≈ sqrt((1.8 x 10^-5)(0.100))</code>
+              <h3>Plan the pH calculation before calculating.</h3>
+              <p>
+                Put the moves in order. Start from the ICE table, solve for{" "}
+                <code>[H+]</code>, then convert <code>[H+]</code> into pH.
               </p>
-              <label>
-                pH
-                <input
-                  value={answer}
-                  onChange={(event) => setAnswer(event.target.value)}
-                  placeholder="2.87"
-                  inputMode="decimal"
-                />
-              </label>
-              {answer && (
-                <div className={`feedback ${answerCorrect ? "success" : "warning"}`}>
-                  {answerCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+
+              <div className="step-bank">
+                {weakAcidCalculationSteps.map((step, index) => (
+                  <button
+                    key={step}
+                    disabled={calculationOrder.includes(index)}
+                    onClick={() => chooseCalculationStep(index)}
+                  >
+                    {step}
+                  </button>
+                ))}
+              </div>
+
+              <div className="ordered-steps">
+                {calculationOrder.length === 0 ? (
+                  <p>Choose the first move.</p>
+                ) : (
+                  calculationOrder.map((stepIndex, index) => (
+                    <div key={`${stepIndex}-${index}`} className="ordered-step">
+                      <span>{index + 1}</span>
+                      <p>{weakAcidCalculationSteps[stepIndex]}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {calculationOrderChecked && (
+                <div
+                  className={`feedback ${calculationOrderCorrect ? "success" : "warning"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {calculationOrderCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
                   <p>
-                    {answerCorrect
-                      ? "Correct. Only about 1.3% ionizes, but that is enough to make pH acidic."
-                      : "Use pH = -log[H+]. The [H+] value is about 0.00134 M."}
+                    {calculationOrderCorrect
+                      ? "Correct. Now solve for x first, then take the negative log."
+                      : "Hint: start with the Ka expression from the ICE table. Rearranging creates the quadratic, and pH comes last."}
                   </p>
                 </div>
               )}
+
+              <div className="button-row">
+                <button
+                  className="secondary-action"
+                  disabled={calculationOrder.length === 0}
+                  onClick={() => {
+                    setCalculationOrder((current) => current.slice(0, -1));
+                    setCalculationOrderChecked(false);
+                  }}
+                >
+                  Undo last
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={calculationOrder.length === 0}
+                  onClick={() => {
+                    setCalculationOrder([]);
+                    setCalculationOrderChecked(false);
+                  }}
+                >
+                  Clear order
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={
+                    calculationOrder.length !==
+                    correctWeakAcidCalculationOrder.length
+                  }
+                  onClick={() => setCalculationOrderChecked(true)}
+                >
+                  Check order
+                </button>
+              </div>
+
+              {calculationOrderChecked && calculationOrderCorrect && (
+                <>
+                  <div className="math-panel">
+                    <strong>Now calculate</strong>
+                    <p>
+                      <code>Ka = x^2 / (0.100 - x)</code>
+                      <br />
+                      <code>x^2 + Ka*x - Ka(0.100) = 0</code>
+                      <br />
+                      <code>
+                        x = (-Ka + sqrt(Ka^2 + 4Ka(0.100))) / 2 = [H+]
+                      </code>
+                      <br />
+                      <code>pH = -log[H+]</code>
+                    </p>
+                  </div>
+                  <label>
+                    pH
+                    <input
+                      value={answer}
+                      onChange={(event) => setAnswer(event.target.value)}
+                      placeholder="2.87"
+                      inputMode="decimal"
+                    />
+                  </label>
+                  {answer && (
+                    <div className={`feedback ${answerCorrect ? "success" : "warning"}`}>
+                      {answerCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+                      <p>
+                        {answerCorrect
+                          ? "Correct. Only about 1.3% ionizes, but that is enough to make pH acidic."
+                          : "Use pH = -log[H+]. The [H+] value is about 0.00134 M."}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
               {revealed && (
                 <div className="math-panel">
                   <strong>Model answer</strong>
@@ -1341,10 +1653,10 @@ function WeakAcidProblem() {
               <div className="button-row">
                 <button
                   className="secondary-action"
-                  disabled={!answer}
+                  disabled={!answerCorrect}
                   onClick={() => setRevealed(true)}
                 >
-                  Reveal after attempt
+                  Show model answer
                 </button>
                 <button className="secondary-action" onClick={reset}>
                   Restart
@@ -1390,10 +1702,38 @@ function WeakAcidVisual({ ionized }: { ionized: boolean }) {
 }
 
 const titrationPoints = [
-  { volume: 0, label: "a) 0.0 mL", answer: "2.87" },
-  { volume: 12.5, label: "b) 12.5 mL", answer: "4.74" },
-  { volume: 25, label: "c) 25.0 mL", answer: "8.72" },
-  { volume: 30, label: "d) 30.0 mL", answer: "11.96" },
+  {
+    id: "a",
+    volume: 0,
+    label: "a) 0.0 mL",
+    answer: "2.87",
+    regionCue: "Initial weak acid",
+    methodCue: "Set up a weak-acid equilibrium before any NaOH reacts.",
+  },
+  {
+    id: "b",
+    volume: 12.5,
+    label: "b) 12.5 mL",
+    answer: "4.74",
+    regionCue: "Half-equivalence",
+    methodCue: "After stoichiometry, HA and A- are present in equal amounts.",
+  },
+  {
+    id: "c",
+    volume: 25,
+    label: "c) 25.0 mL",
+    answer: "8.72",
+    regionCue: "Equivalence point",
+    methodCue: "All HA has become A-, so acetate acts as a weak base.",
+  },
+  {
+    id: "d",
+    volume: 30,
+    label: "d) 30.0 mL",
+    answer: "11.96",
+    regionCue: "After equivalence",
+    methodCue: "Excess strong base controls pH after neutralization.",
+  },
 ];
 
 function titrationState(volume: number) {
@@ -1416,7 +1756,7 @@ function titrationState(volume: number) {
     const a = baseMoles;
     return {
       region: volume === 12.5 ? "Half-equivalence" : "Buffer region",
-      method: volume === 12.5 ? "pH = pKa" : "Stoichiometry, then Henderson-Hasselbalch",
+      method: volume === 12.5 ? "Equal HA/A- shortcut" : "Stoichiometry, then Henderson-Hasselbalch",
       pH: aceticPka + Math.log10(a / ha),
       ha,
       a,
@@ -1450,14 +1790,105 @@ function titrationState(volume: number) {
   };
 }
 
+function isTitrationAnswerCorrect(value: string | undefined, answer: string) {
+  return Math.abs(Number(value) - Number(answer)) <= 0.05;
+}
+
+function getTitrationHint(
+  pointId: string,
+  attemptCount: number,
+  state: ReturnType<typeof titrationState>,
+) {
+  const hints: Record<string, string[]> = {
+    a: [
+      "This is before any strong base is added, so no stoichiometry step happens yet.",
+      "Use the weak-acid equilibrium for HA with Ka = 1.8 x 10^-5 and initial [HA] = 0.100 M.",
+      "Solve [H+] from Ka = x^2 / (0.100 - x), then take -log[H+].",
+    ],
+    b: [
+      "First do the neutralization moles: OH- converts HA into A-.",
+      "At 12.5 mL, the added OH- is half the original acid moles, so HA and A- end up equal.",
+      "In Henderson-Hasselbalch, the ratio term is log(1), so only the acid constant sets the value.",
+    ],
+    c: [
+      "At equivalence, there is no HA left and no excess OH-. The solution contains acetate.",
+      "Acetate is a weak base, so convert Ka to Kb with Kw / Ka.",
+      "Use [A-] = 0.00250 mol / 0.0500 L, find [OH-], then convert to pH.",
+    ],
+    d: [
+      "After equivalence, extra strong base remains and dominates the pH.",
+      "Find excess OH- moles: moles NaOH added minus original HA moles.",
+      "Divide excess OH- by total volume, find pOH, then use pH = 14 - pOH.",
+    ],
+  };
+  const pointHints = hints[pointId] ?? [state.note];
+  return pointHints[Math.min(attemptCount - 1, pointHints.length - 1)];
+}
+
+function getTitrationHints(
+  pointId: string,
+  attemptCount: number,
+  state: ReturnType<typeof titrationState>,
+) {
+  return Array.from(
+    { length: Math.min(attemptCount, 3) },
+    (_, index) => getTitrationHint(pointId, index + 1, state),
+  );
+}
+
+function TitrationRegionMap({
+  activeVolume,
+  onSelectVolume,
+}: {
+  activeVolume: number;
+  onSelectVolume?: (volume: number) => void;
+}) {
+  return (
+    <div className="region-map" aria-label="Titration regions and methods">
+      {titrationPoints.map((point) => {
+        const active = Math.abs(activeVolume - point.volume) < 0.25;
+        const content = (
+          <>
+            <span>{point.label}</span>
+            <strong>{point.regionCue}</strong>
+            <p>{point.methodCue}</p>
+          </>
+        );
+        if (onSelectVolume) {
+          return (
+            <button
+              key={point.id}
+              className={active ? "active" : ""}
+              onClick={() => onSelectVolume(point.volume)}
+              type="button"
+            >
+              {content}
+            </button>
+          );
+        }
+        return (
+          <div key={point.id} className={active ? "active" : ""}>
+            {content}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TitrationProblem() {
   const guideRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState(0);
   const [volume, setVolume] = useState(0);
+  const [equivalenceEstimate, setEquivalenceEstimate] = useState("");
+  const [patternEstimate, setPatternEstimate] = useState("");
+  const [estimateChecked, setEstimateChecked] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState(false);
+  const [attempts, setAttempts] = useState<Record<string, number>>({});
   const state = titrationState(volume);
   const progress = Math.round((phase / 2) * 100);
+  const estimateCorrect =
+    equivalenceEstimate === "25" && patternEstimate === "weak-base-equivalence";
 
   useEffect(() => {
     guideRef.current?.focus({ preventScroll: true });
@@ -1466,14 +1897,28 @@ function TitrationProblem() {
   function reset() {
     setPhase(0);
     setVolume(0);
+    setEquivalenceEstimate("");
+    setPatternEstimate("");
+    setEstimateChecked(false);
     setAnswers({});
-    setRevealed(false);
+    setAttempts({});
   }
 
-  const allAttempted = titrationPoints.every((point) => answers[point.label]);
   const allCorrect = titrationPoints.every(
-    (point) => Math.abs(Number(answers[point.label]) - Number(point.answer)) <= 0.05,
+    (point) => isTitrationAnswerCorrect(answers[point.id], point.answer),
   );
+  const activePointIndex = titrationPoints.findIndex(
+    (point) => !isTitrationAnswerCorrect(answers[point.id], point.answer),
+  );
+  const currentPointIndex =
+    activePointIndex === -1 ? titrationPoints.length - 1 : activePointIndex;
+
+  function checkTitrationPoint(id: string) {
+    setAttempts((current) => ({
+      ...current,
+      [id]: (current[id] ?? 0) + 1,
+    }));
+  }
 
   return (
     <section className="workspace">
@@ -1503,23 +1948,107 @@ function TitrationProblem() {
             <span aria-hidden="true">-&gt;</span>
             <p>
               {phase === 0 && "Start here: know the four required points."}
-              {phase === 1 && "Drag the slider: the method changes by region."}
+              {phase === 1 && "Drag the slider or click A-D to jump between regions."}
               {phase === 2 && "Finish here: calculate each checkpoint."}
             </p>
           </div>
 
           {phase === 0 && (
             <div className="step-card">
-              <p className="eyebrow">Set up</p>
+              <p className="eyebrow">Estimate</p>
               <h3>25.0 mL of 0.100 M acetic acid is titrated with 0.100 M NaOH.</h3>
               <p className="problem-text">
                 Calculate pH before NaOH, after 12.5 mL, at equivalence, and
                 after 30.0 mL. The key is choosing the right method for each
                 region.
               </p>
-              <button className="primary-action" onClick={() => setPhase(1)}>
-                Explore regions <ChevronRight size={18} />
-              </button>
+              <fieldset>
+                <legend>Where should equivalence happen?</legend>
+                <div className="segmented">
+                  {[
+                    ["12.5", "12.5 mL"],
+                    ["25", "25.0 mL"],
+                    ["30", "30.0 mL"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      aria-pressed={equivalenceEstimate === value}
+                      className={equivalenceEstimate === value ? "selected" : ""}
+                      onClick={() => {
+                        setEquivalenceEstimate(value);
+                        setEstimateChecked(false);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>What should the pH pattern look like?</legend>
+                <div className="choice-stack">
+                  {[
+                    [
+                      "weak-base-equivalence",
+                      "Starts acidic, rises through a buffer region, and equivalence is above 7",
+                    ],
+                    [
+                      "neutral-equivalence",
+                      "Starts acidic, rises, and equivalence is exactly 7",
+                    ],
+                    [
+                      "always-acidic",
+                      "Stays below 7 at all four checkpoints",
+                    ],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      aria-pressed={patternEstimate === value}
+                      className={
+                        patternEstimate === value ? "selected choice" : "choice"
+                      }
+                      onClick={() => {
+                        setPatternEstimate(value);
+                        setEstimateChecked(false);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {estimateChecked && (
+                <div
+                  className={`feedback ${estimateCorrect ? "success" : "warning"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {estimateCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+                  <p>
+                    {estimateCorrect
+                      ? "Correct. Equal molarities mean 25.0 mL reaches equivalence, and acetate makes equivalence basic."
+                      : equivalenceEstimate !== "25"
+                        ? "Hint: initial acid moles are 0.0250 L x 0.100 M. With 0.100 M NaOH, the same number of moles needs the same volume."
+                        : "Hint: at equivalence the solution contains acetate, the conjugate base of a weak acid, so the pH is above 7."}
+                  </p>
+                </div>
+              )}
+              <div className="button-row">
+                <button
+                  className="secondary-action"
+                  disabled={!equivalenceEstimate || !patternEstimate}
+                  onClick={() => setEstimateChecked(true)}
+                >
+                  Check estimate
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={!estimateChecked || !estimateCorrect}
+                  onClick={() => setPhase(1)}
+                >
+                  Explore regions <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1527,6 +2056,10 @@ function TitrationProblem() {
             <div className="step-card">
               <p className="eyebrow">Explore</p>
               <h3>{state.region}</h3>
+              <p>
+                Drag the bar or click a checkpoint card to move the curve marker
+                to that titration region.
+              </p>
               <label>
                 NaOH added: {volume.toFixed(1)} mL
                 <input
@@ -1543,6 +2076,10 @@ function TitrationProblem() {
                 <strong>{state.method}</strong>
                 <p>{state.note}</p>
               </div>
+              <TitrationRegionMap
+                activeVolume={volume}
+                onSelectVolume={setVolume}
+              />
               <button className="primary-action" onClick={() => setPhase(2)}>
                 Solve checkpoints <ChevronRight size={18} />
               </button>
@@ -1552,28 +2089,64 @@ function TitrationProblem() {
           {phase === 2 && (
             <div className="step-card">
               <p className="eyebrow">Calculate</p>
-              <h3>Enter the four pH values.</h3>
+              <h3>Submit each pH value one at a time.</h3>
+              <TitrationRegionMap
+                activeVolume={titrationPoints[currentPointIndex].volume}
+              />
               <div className="checkpoint-grid">
-                {titrationPoints.map((point) => {
+                {titrationPoints.map((point, index) => {
                   const pointState = titrationState(point.volume);
-                  const value = answers[point.label] ?? "";
-                  const correct = Math.abs(Number(value) - Number(point.answer)) <= 0.05;
+                  const value = answers[point.id] ?? "";
+                  const correct = isTitrationAnswerCorrect(value, point.answer);
+                  const locked = index > currentPointIndex;
+                  const checked = (attempts[point.id] ?? 0) > 0;
                   return (
-                    <label key={point.label}>
-                      <span>{point.label}: {pointState.method}</span>
+                    <div
+                      key={point.id}
+                      className={`checkpoint-card ${index === currentPointIndex ? "active" : ""} ${correct ? "complete" : ""}`}
+                    >
+                      <div>
+                        <span>{point.label}</span>
+                        <strong>{point.regionCue}</strong>
+                        <p>{point.methodCue}</p>
+                      </div>
                       <input
+                        aria-label={`${point.label} pH`}
                         value={value}
+                        disabled={locked || correct}
                         onChange={(event) =>
                           setAnswers((current) => ({
                             ...current,
-                            [point.label]: event.target.value,
+                            [point.id]: event.target.value,
                           }))
                         }
-                        placeholder={revealed ? point.answer : "pH"}
+                        placeholder={locked ? "locked" : "pH"}
                         inputMode="decimal"
                       />
-                      {value && <small>{correct ? "Correct" : pointState.note}</small>}
-                    </label>
+                      <button
+                        className="secondary-action"
+                        disabled={locked || correct || !value}
+                        onClick={() => checkTitrationPoint(point.id)}
+                      >
+                        Check
+                      </button>
+                      {correct && <small className="success-text">Correct</small>}
+                      {!correct && checked && (
+                        <div className="hint-stack" role="status" aria-live="polite">
+                          {getTitrationHints(
+                            point.id,
+                            attempts[point.id] ?? 1,
+                            pointState,
+                          ).map((hint, hintIndex) => (
+                            <div key={hint} className="hint-card">
+                              <span>Hint {hintIndex + 1}</span>
+                              <p>{hint}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {locked && <small>Unlocks after the previous part is correct.</small>}
+                    </div>
                   );
                 })}
               </div>
@@ -1583,21 +2156,6 @@ function TitrationProblem() {
                   <p>Correct. This problem switches methods four times.</p>
                 </div>
               )}
-              {revealed && (
-                <div className="math-panel">
-                  <strong>Model answers</strong>
-                  <p>
-                    a) 2.87, b) 4.74, c) 8.72, d) 11.96.
-                  </p>
-                </div>
-              )}
-              <button
-                className="secondary-action"
-                disabled={!allAttempted}
-                onClick={() => setRevealed(true)}
-              >
-                Reveal after all attempts
-              </button>
             </div>
           )}
         </section>
@@ -1613,22 +2171,13 @@ function TitrationVisual({
   volume: number;
   state: ReturnType<typeof titrationState>;
 }) {
-  const curvePoints = [
-    [10, 155],
-    [70, 150],
-    [126.7, 112.3],
-    [145, 92],
-    [155, 77],
-    [243.3, 47.4],
-    [290, 18],
-  ];
   const markerX = (volume / 30) * 280 + 10;
-  const markerY = interpolateCurveY(markerX, curvePoints);
+  const markerY = phToCurveY(state.pH);
   return (
     <div className="beaker-card">
       <div className="titration-curve" aria-label={`Titration curve at ${volume} mL NaOH`}>
         <svg viewBox="0 0 300 180" role="img">
-          <path d="M10 155 C80 150 120 118 145 92 S165 22 290 18" />
+          <path d="M10 128 C18 116 35 111 60 108 C88 106 112 110 126.7 109 C165 104 210 96 235 78 C241 72 242 70 243.3 68 C244 46 247 32 253 27 C264 21 280 18 290 17" />
           <circle cx={markerX} cy={markerY} r="6" />
         </svg>
         <strong>pH {state.pH.toFixed(2)}</strong>
@@ -1646,16 +2195,10 @@ function TitrationVisual({
   );
 }
 
-function interpolateCurveY(x: number, points: number[][]) {
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const [x1, y1] = points[index];
-    const [x2, y2] = points[index + 1];
-    if (x >= x1 && x <= x2) {
-      const fraction = (x - x1) / (x2 - x1);
-      return y1 + (y2 - y1) * fraction;
-    }
-  }
-  return points[points.length - 1][1];
+function phToCurveY(pH: number) {
+  const minY = 158;
+  const maxY = 14;
+  return minY - (pH / 14) * (minY - maxY);
 }
 
 function Progress({ value, label }: { value: number; label: string }) {

@@ -886,6 +886,46 @@ textarea {
   background: #ffffff;
 }
 
+.ice-grid {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+
+.ice-grid span,
+.ice-grid input {
+  min-height: 38px;
+  border-radius: 6px;
+}
+
+.ice-grid span {
+  display: grid;
+  align-items: center;
+  padding: 6px 8px;
+  background: #ffffff;
+  color: #3d5157;
+  font-weight: 900;
+}
+
+.ice-grid input {
+  margin: 0;
+  padding: 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+}
+
+.ice-grid input.correct {
+  border-color: #4f9b5e;
+  background: #eff9f1;
+}
+
+.ice-grid input.incorrect {
+  border-color: #c98500;
+  background: #fff7df;
+}
+
 .ledger-grid span {
   color: #3d5157;
   font-weight: 900;
@@ -927,6 +967,66 @@ textarea {
   margin: 6px 0 0;
 }
 
+.region-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.region-map div,
+.region-map button,
+.checkpoint-card {
+  border: 1px solid #d4dfdc;
+  border-radius: 8px;
+  background: #f8fbfb;
+  padding: 12px;
+}
+
+.region-map button {
+  color: #172024;
+  cursor: pointer;
+  text-align: left;
+}
+
+.region-map button:hover,
+.region-map button:focus-visible {
+  border-color: #1c7f9a;
+  outline: 2px solid #8bd3e6;
+  outline-offset: 2px;
+}
+
+.region-map div.active,
+.region-map button.active,
+.checkpoint-card.active {
+  border-color: #1c7f9a;
+  background: #e7f6f9;
+  box-shadow: inset 0 0 0 2px rgba(28, 127, 154, 0.12);
+}
+
+.region-map span,
+.checkpoint-card span {
+  display: block;
+  color: #5f7379;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.region-map strong,
+.checkpoint-card strong {
+  display: block;
+  margin-top: 5px;
+}
+
+.region-map p,
+.checkpoint-card p {
+  margin: 6px 0 0;
+  color: #41545a;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .checkline {
   display: grid;
   grid-template-columns: 18px 1fr;
@@ -946,22 +1046,52 @@ textarea {
   gap: 12px;
 }
 
-.checkpoint-grid label {
+.checkpoint-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.checkpoint-card.complete {
+  border-color: #72a879;
+  background: #eff9f1;
+}
+
+.checkpoint-card input {
   margin: 0;
-  padding: 12px;
-  border: 1px solid #d4dfdc;
-  border-radius: 8px;
-  background: #f8fbfb;
 }
 
-.checkpoint-grid label span,
-.checkpoint-grid small {
-  display: block;
-}
-
-.checkpoint-grid small {
-  margin-top: 6px;
+.checkpoint-card small {
+  grid-column: 1 / -1;
   color: #4f6268;
+}
+
+.checkpoint-card .success-text {
+  color: #287239;
+  font-weight: 900;
+}
+
+.hint-stack {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.hint-card {
+  border-left: 5px solid #c98500;
+  border-radius: 8px;
+  background: #fff6dc;
+  padding: 10px 12px;
+}
+
+.hint-card span {
+  color: #6a4700;
+}
+
+.hint-card p {
+  margin: 4px 0 0;
 }
 
 .titration-curve {
