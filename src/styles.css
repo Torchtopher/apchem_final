@@ -102,6 +102,16 @@ button:disabled {
   background: #28444b;
 }
 
+.problem-tab.challenge-tab {
+  border-color: #6b5840;
+  background: #2f342f;
+}
+
+.problem-tab.challenge-tab.active {
+  border-color: #d99513;
+  background: #3c3a2f;
+}
+
 .problem-tab.locked {
   color: #a8b6bb;
 }
@@ -124,6 +134,27 @@ button:disabled {
 .problem-tab small {
   margin-top: 3px;
   color: #b7c6ca;
+}
+
+.teacher-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid #51676e;
+  border-radius: 8px;
+  background: #203238;
+  color: #f8fbfb;
+  font-weight: 900;
+}
+
+.teacher-toggle.active {
+  border-color: #f0c46a;
+  background: #5b4117;
+  color: #fff7df;
 }
 
 .workspace {
@@ -738,6 +769,71 @@ textarea {
   resize: vertical;
 }
 
+.teacher-fill-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.teacher-fill-field input,
+.teacher-fill-field textarea {
+  padding-right: 44px;
+}
+
+.teacher-fill-field select {
+  padding-right: 44px;
+}
+
+.teacher-fill-field textarea + .magic-fill-button {
+  top: 14px;
+  transform: none;
+}
+
+.magic-fill-button {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d7ad48;
+  border-radius: 8px;
+  background: #fff7df;
+  color: #6a4700;
+  box-shadow: 0 2px 8px rgba(80, 54, 0, 0.12);
+  transform: translateY(-50%);
+}
+
+.magic-fill-button.inline {
+  position: static;
+  transform: none;
+}
+
+.magic-fill-button:hover,
+.magic-fill-button:focus-visible {
+  border-color: #a76e00;
+  outline: 2px solid #f0c46a;
+  outline-offset: 2px;
+}
+
+.choice-with-fill {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.choice-with-fill .segmented,
+.choice-with-fill .choice-stack {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-with-fill .magic-fill-button.inline {
+  margin-top: 0;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -894,10 +990,47 @@ textarea {
   align-items: stretch;
 }
 
+.ice-given-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ice-given-grid div {
+  border: 1px solid #d4dfdc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.ice-given-grid span {
+  display: block;
+  color: #5f7379;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ice-given-grid code {
+  display: block;
+  margin-top: 4px;
+  color: #172024;
+  font-size: 0.88rem;
+  font-weight: 900;
+  white-space: normal;
+}
+
 .ice-grid span,
-.ice-grid input {
+.ice-grid input,
+.ice-fill-field {
   min-height: 38px;
   border-radius: 6px;
+}
+
+.ice-fill-field input {
+  height: 38px;
+  padding-right: 40px;
 }
 
 .ice-grid span {
@@ -911,9 +1044,25 @@ textarea {
 
 .ice-grid input {
   margin: 0;
-  padding: 0 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 800;
+}
+
+.ice-fill-field .magic-fill-button {
+  right: 3px;
+  width: 28px;
+  height: 28px;
+}
+
+.teacher-order-fill {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 8px;
+}
+
+.ice-grid input::placeholder {
+  color: #71858b;
+  opacity: 1;
 }
 
 .ice-grid input.correct {
@@ -969,7 +1118,7 @@ textarea {
 
 .region-map {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   margin: 16px 0;
 }
@@ -1017,6 +1166,7 @@ textarea {
 .checkpoint-card strong {
   display: block;
   margin-top: 5px;
+  overflow-wrap: anywhere;
 }
 
 .region-map p,
@@ -1059,6 +1209,10 @@ textarea {
 }
 
 .checkpoint-card input {
+  margin: 0;
+}
+
+.checkpoint-fill-field {
   margin: 0;
 }
 
@@ -1112,12 +1266,220 @@ textarea {
   stroke: #1c7f9a;
   stroke-width: 5;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .titration-curve circle {
   fill: #c8336a;
   stroke: #ffffff;
   stroke-width: 3;
+}
+
+.titration-curve .axis-line {
+  stroke: #31464d;
+  stroke-width: 1.5;
+}
+
+.titration-curve .tick-line {
+  stroke: #c9d4d1;
+  stroke-width: 1;
+}
+
+.titration-curve .axis-tick {
+  fill: #4f6268;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.titration-curve .axis-title {
+  fill: #233136;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.challenge-workspace .topbar {
+  margin-bottom: 18px;
+}
+
+.challenge-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.challenge-main,
+.challenge-side {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.challenge-side {
+  position: sticky;
+  top: 16px;
+}
+
+.challenge-card,
+.challenge-answer-card {
+  border: 1px solid #d1dcd9;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(30, 47, 53, 0.08);
+}
+
+.challenge-card {
+  padding: 18px;
+}
+
+.challenge-prompt h3 {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+}
+
+.challenge-prompt p {
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+
+.challenge-prompt ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.challenge-prompt li {
+  line-height: 1.45;
+}
+
+.challenge-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.challenge-answer-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.challenge-answer-card.complete {
+  border-color: #72a879;
+  background: #f4fbf5;
+}
+
+.challenge-answer-card span,
+.challenge-stage-label span,
+.challenge-constants dt {
+  display: block;
+  color: #5f7379;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.challenge-answer-card strong,
+.challenge-stage-label strong {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.25;
+}
+
+.challenge-input-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.challenge-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.challenge-input-row input {
+  margin: 0;
+}
+
+.challenge-input-row span {
+  color: #25383e;
+}
+
+.challenge-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.challenge-state-card {
+  display: grid;
+  gap: 12px;
+}
+
+.challenge-stage-label {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dce7e4;
+}
+
+.challenge-meter {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2a65a, #f4e285, #5bc0be);
+}
+
+.challenge-meter.locked {
+  background: repeating-linear-gradient(
+    135deg,
+    #dce7e4,
+    #dce7e4 8px,
+    #edf3f1 8px,
+    #edf3f1 16px
+  );
+}
+
+.challenge-meter span {
+  position: absolute;
+  top: -5px;
+  width: 5px;
+  height: 26px;
+  border-radius: 999px;
+  background: #172024;
+  transform: translateX(-50%);
+}
+
+.challenge-ph {
+  font-size: 1.35rem;
+}
+
+.challenge-constants {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.challenge-constants div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3ece9;
+}
+
+.challenge-constants div:last-child {
+  border-bottom: 0;
+}
+
+.challenge-constants dd {
+  margin: 0;
+  font-weight: 900;
+}
+
+.challenge-finish {
+  margin: 0;
 }
 
 .primary-action,
@@ -1193,6 +1555,18 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .lab-grid:has(.show-visual) {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-side {
+    position: static;
+  }
+
   .phase-steps {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -1217,6 +1591,7 @@ textarea {
   .summary-grid,
   .button-row,
   .known-grid,
+  .ice-given-grid,
   .ratio-panel {
     grid-template-columns: 1fr;
     flex-direction: column;
@@ -1232,6 +1607,15 @@ textarea {
 
   .step-card h3 {
     font-size: 1.45rem;
+  }
+
+  .challenge-answer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-card,
+  .challenge-answer-card {
+    padding: 14px;
   }
 
   .readout {
