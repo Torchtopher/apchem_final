@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, ChevronRight, Lightbulb, RotateCcw } from "lucide-react";
-import { Progress, TeacherFillButton, shuffledIndices } from "../shared";
+import { ProblemFacts, Progress, StepBackButton, TeacherFillButton, shuffledIndices } from "../shared";
 
 type IceField =
   | "initialHa"
@@ -25,6 +25,12 @@ const weakAcidCalculationSteps = [
   "Convert concentration to pH with pH = -log[H+].",
 ];
 const correctWeakAcidCalculationOrder = [0, 1, 2, 3];
+const weakAcidFacts = [
+  "0.100 M HC2H3O2.",
+  "Ka = 1.8 x 10^-5.",
+  "Reaction: HA ⇌ H+ + A-.",
+  "Target: calculate pH.",
+];
 
 const emptyIceTable: Record<IceField, string> = {
   initialHa: "",
@@ -289,6 +295,11 @@ export function WeakAcidProblem({ teacherMode }: { teacherMode: boolean }) {
           aria-live="polite"
           aria-label="Weak acid guided step"
         >
+          {phase > 0 && <ProblemFacts facts={weakAcidFacts} />}
+          <StepBackButton
+            disabled={phase === 0}
+            onBack={() => setPhase((current) => Math.max(0, current - 1))}
+          />
           <div className="focus-cue">
             <span aria-hidden="true">-&gt;</span>
             <p>

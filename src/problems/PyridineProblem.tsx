@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Beaker, Check, ChevronRight, Lightbulb, RotateCcw, TestTube2 } from "lucide-react";
-import { Counter, TeacherFillButton, shuffledIndices } from "../shared";
+import { Counter, ProblemFacts, StepBackButton, TeacherFillButton, shuffledIndices } from "../shared";
 
-type Choice = "lower" | "higher" | "same" | "";
+type Choice = "lower" | "higher" | "";
 type DataChoice = "none" | "pka" | "pkb" | "";
 type Route = "shortcut" | "long" | "unset";
 type IceField =
@@ -53,10 +53,17 @@ const correctStepOrder = [0, 1, 2, 3, 4];
 const phaseLabels = [
   "Predict",
   "Choose data",
+  "Stoichiometry",
   "Plan math",
   "Animate",
   "Answer",
   "Reflect",
+];
+const pyridineFacts = [
+  "0.308 mol H+ is added.",
+  "1.00 L buffer solution.",
+  "Buffer starts with 0.560 M py and 0.460 M pyH+.",
+  "Target: delta pH = final pH - initial pH.",
 ];
 
 function afterAcidAddition(state: BufferState, acidMoles: number): BufferState {
@@ -122,9 +129,8 @@ function bufferLedgerFieldIsCorrect(field: BufferLedgerField, value: string) {
 }
 
 function bufferLedgerIsCorrect(values: Record<BufferLedgerField, string>) {
-  return (Object.keys(values) as BufferLedgerField[]).every((field) =>
-    bufferLedgerFieldIsCorrect(field, values[field]),
-  );
+  return (["changePy", "afterPy", "changePyH", "afterPyH", "afterH"] as BufferLedgerField[])
+    .every((field) => bufferLedgerFieldIsCorrect(field, values[field]));
 }
 
 const finalBuffer = afterAcidAddition(initialBuffer, addedH);
@@ -138,6 +144,7 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
   const [prediction, setPrediction] = useState<Choice>("");
   const [magnitude, setMagnitude] = useState("");
   const [predictionReason, setPredictionReason] = useState("");
+  const [predictionCompared, setPredictionCompared] = useState(false);
   const [dataChoice, setDataChoice] = useState<DataChoice>("");
   const [route, setRoute] = useState<Route>("unset");
   const [selectedSteps, setSelectedSteps] = useState<number[]>([]);
@@ -160,8 +167,8 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
   const answerCorrect = isCloseToAnswer(finalAnswer);
 
   const progress = useMemo(() => {
-    if (phase >= 5) return 100;
-    return Math.round((phase / 5) * 100);
+    if (phase >= 6) return 100;
+    return Math.round((phase / 6) * 100);
   }, [phase]);
 
   useEffect(() => {
@@ -173,6 +180,7 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
     setPrediction("");
     setMagnitude("");
     setPredictionReason("");
+    setPredictionCompared(false);
     setDataChoice("");
     setRoute("unset");
     setSelectedSteps([]);
@@ -238,21 +246,21 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
 
       <div className="lab-grid">
         <section
-          className={`visual-panel ${phase === 3 ? "show-visual" : ""}`}
+          className={`visual-panel ${phase === 4 ? "show-visual" : ""}`}
           aria-label={
             acidAdded
               ? "After acid addition: 0.252 mol py and 0.768 mol pyH plus."
               : "Before acid addition: 0.560 mol py and 0.460 mol pyH plus."
           }
         >
-          <BeakerScene acidAdded={acidAdded} showCue={phase === 3} />
-          {phase === 3 && acidAdded && (
+          <BeakerScene acidAdded={acidAdded} showCue={phase === 4} />
+          {phase === 4 && acidAdded && (
             <>
               <PHRuler
                 acidAdded={acidAdded}
                 route={route}
                 constantsEarned={phase >= 2}
-                summaryVisible={phase >= 5}
+                summaryVisible={phase >= 6}
               />
               <SpeciesCounters acidAdded={acidAdded} />
             </>
@@ -266,6 +274,11 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
           aria-live="polite"
           aria-label={`Current step: ${phaseLabels[phase]}`}
         >
+          {phase > 0 && <ProblemFacts facts={pyridineFacts} />}
+          <StepBackButton
+            disabled={phase === 0}
+            onBack={() => setPhase((current) => Math.max(0, current - 1))}
+          />
           <FocusCue phase={phase} acidAdded={acidAdded} />
           {phase === 0 && (
             <ProblemIntro
@@ -275,6 +288,8 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
               setMagnitude={setMagnitude}
               predictionReason={predictionReason}
               setPredictionReason={setPredictionReason}
+              predictionCompared={predictionCompared}
+              setPredictionCompared={setPredictionCompared}
               teacherMode={teacherMode}
               onContinue={() => setPhase(1)}
             />
@@ -294,10 +309,6 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
             <CalculationPath
               route={route}
               dataChoice={dataChoice}
-              selectedSteps={selectedSteps}
-              stepOrder={stepOrder}
-              orderedCorrectly={orderedCorrectly}
-              stepsComplete={stepsComplete}
               ledgerValues={ledgerValues}
               ledgerChecked={ledgerChecked}
               ledgerCorrect={bufferLedgerIsCorrect(ledgerValues)}
@@ -307,28 +318,40 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
                 setLedgerChecked(false);
               }}
               onLedgerCheck={() => setLedgerChecked(true)}
-              onChooseStep={chooseStep}
-              onFillOrder={() => {
-                setSelectedSteps(correctStepOrder);
-                setLedgerChecked(true);
-              }}
-              onUndo={() =>
-                setSelectedSteps((current) => current.slice(0, -1))
-              }
-              onClear={() => setSelectedSteps([])}
               onContinue={() => setPhase(3)}
             />
           )}
 
           {phase === 3 && (
-            <AddAcidStep
-              acidAdded={acidAdded}
-              onAdd={() => setAcidAdded(true)}
+            <CalculationPlan
+              route={route}
+              dataChoice={dataChoice}
+              selectedSteps={selectedSteps}
+              stepOrder={stepOrder}
+              orderedCorrectly={orderedCorrectly}
+              stepsComplete={stepsComplete}
+              teacherMode={teacherMode}
+              onChooseStep={chooseStep}
+              onFillOrder={() => {
+                setSelectedSteps(correctStepOrder);
+              }}
+              onUndo={() =>
+                setSelectedSteps((current) => current.slice(0, -1))
+              }
+              onClear={() => setSelectedSteps([])}
               onContinue={() => setPhase(4)}
             />
           )}
 
           {phase === 4 && (
+            <AddAcidStep
+              acidAdded={acidAdded}
+              onAdd={() => setAcidAdded(true)}
+              onContinue={() => setPhase(5)}
+            />
+          )}
+
+          {phase === 5 && (
             <AnswerStep
               finalAnswer={finalAnswer}
               setFinalAnswer={setFinalAnswer}
@@ -336,11 +359,11 @@ export function PyridineProblem({ teacherMode }: { teacherMode: boolean }) {
               revealed={revealed}
               setRevealed={setRevealed}
               teacherMode={teacherMode}
-              onContinue={() => setPhase(5)}
+              onContinue={() => setPhase(6)}
             />
           )}
 
-          {phase === 5 && (
+          {phase === 6 && (
             <SummaryStep
               prediction={prediction}
               magnitude={magnitude}
@@ -361,7 +384,8 @@ function FocusCue({ phase, acidAdded }: { phase: number; acidAdded: boolean }) {
   const messages = [
     "Start here: make a prediction before doing any math.",
     "Look here: decide what data is actually needed.",
-    "Look here: build the legal calculation order.",
+    "Look here: use stoichiometry to get the new buffer ratio.",
+    "Look here: put the calculation moves in order.",
     acidAdded
       ? "Now look left: the particle counts and pH ruler changed."
       : "Click Add H+, then watch the beaker and counters.",
@@ -384,6 +408,8 @@ function ProblemIntro({
   setMagnitude,
   predictionReason,
   setPredictionReason,
+  predictionCompared,
+  setPredictionCompared,
   teacherMode,
   onContinue,
 }: {
@@ -393,10 +419,11 @@ function ProblemIntro({
   setMagnitude: (value: string) => void;
   predictionReason: string;
   setPredictionReason: (value: string) => void;
+  predictionCompared: boolean;
+  setPredictionCompared: (value: boolean) => void;
   teacherMode: boolean;
   onContinue: () => void;
 }) {
-  const [showComparison, setShowComparison] = useState(false);
   const ready = prediction && magnitude && predictionReason.trim().length > 8;
 
   return (
@@ -417,7 +444,6 @@ function ProblemIntro({
             {[
               ["lower", "Lower"],
               ["higher", "Higher"],
-              ["same", "About same"],
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -478,7 +504,7 @@ function ProblemIntro({
         </div>
       </label>
 
-      {showComparison && (
+      {predictionCompared && (
         <ModelChecklist
           title="Compare your prediction"
           items={[
@@ -489,11 +515,11 @@ function ProblemIntro({
         />
       )}
 
-      {!showComparison ? (
+      {!predictionCompared ? (
         <button
           className="primary-action"
           disabled={!ready}
-          onClick={() => setShowComparison(true)}
+          onClick={() => setPredictionCompared(true)}
         >
           Compare with model reasoning <ChevronRight size={18} />
         </button>
@@ -595,16 +621,172 @@ function DataDecision({
 function CalculationPath({
   route,
   dataChoice,
-  selectedSteps,
-  stepOrder,
-  orderedCorrectly,
-  stepsComplete,
   ledgerValues,
   ledgerChecked,
   ledgerCorrect,
   teacherMode,
   onLedgerChange,
   onLedgerCheck,
+  onContinue,
+}: {
+  route: Route;
+  dataChoice: DataChoice;
+  ledgerValues: Record<BufferLedgerField, string>;
+  ledgerChecked: boolean;
+  ledgerCorrect: boolean;
+  teacherMode: boolean;
+  onLedgerChange: (field: BufferLedgerField, value: string) => void;
+  onLedgerCheck: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="step-card">
+      <p className="eyebrow">Stoichiometry first</p>
+      <h3>Track what the added H+ consumes.</h3>
+      <p>
+        {route === "shortcut"
+          ? "Shortcut path: compare the buffer ratio before and after acid is consumed."
+          : dataChoice === "pkb"
+            ? "Long path: convert pKb to pKa, compute initial and final pH, then subtract."
+            : "Long path: compute initial and final pH with pKa, then subtract."}
+      </p>
+
+      <div className="next-step-card">
+        <span>Next target</span>
+        <strong>{ledgerCorrect ? "Buffer ratio" : "Stoichiometry"}</strong>
+        <p>
+          {ledgerCorrect
+            ? "Now compare the starting buffer ratio with the final buffer ratio."
+            : "Use the reaction amounts first. The buffer ratio only makes sense after the strong acid is consumed."}
+        </p>
+      </div>
+
+      <div className="stoich-walkthrough" aria-label="Stoichiometry walkthrough">
+        <div className="reaction-strip">
+          <span>H+</span>
+          <strong>+</strong>
+          <span>py</span>
+          <ArrowRight size={18} />
+          <span>pyH+</span>
+        </div>
+        <div className="stoich-comparison">
+          <div>
+            <span>Available base</span>
+            <strong>0.560 mol py</strong>
+          </div>
+          <div>
+            <span>Added acid</span>
+            <strong>0.308 mol H+</strong>
+          </div>
+          <div>
+            <span>Starting conjugate acid</span>
+            <strong>0.460 mol pyH+</strong>
+          </div>
+        </div>
+        <p>
+          The reaction is 1:1. Because <code>0.308 mol H+</code> is less than{" "}
+          <code>0.560 mol py</code>, all added acid reacts and pyridine is left over.
+        </p>
+        <div className="stoich-input-grid">
+          <StoichInput
+            field="changePy"
+            label="change in py"
+            value={ledgerValues.changePy}
+            checked={ledgerChecked}
+            teacherMode={teacherMode}
+            onChange={onLedgerChange}
+          />
+          <StoichInput
+            field="afterPy"
+            label="py left"
+            value={ledgerValues.afterPy}
+            checked={ledgerChecked}
+            teacherMode={teacherMode}
+            onChange={onLedgerChange}
+          />
+          <StoichInput
+            field="changePyH"
+            label="pyH+ formed"
+            value={ledgerValues.changePyH}
+            checked={ledgerChecked}
+            teacherMode={teacherMode}
+            onChange={onLedgerChange}
+          />
+          <StoichInput
+            field="afterPyH"
+            label="final pyH+"
+            value={ledgerValues.afterPyH}
+            checked={ledgerChecked}
+            teacherMode={teacherMode}
+            onChange={onLedgerChange}
+          />
+          <StoichInput
+            field="afterH"
+            label="H+ left after reaction"
+            value={ledgerValues.afterH}
+            checked={ledgerChecked}
+            teacherMode={teacherMode}
+            onChange={onLedgerChange}
+          />
+        </div>
+        {ledgerChecked && (
+          <div className={`feedback ${ledgerCorrect ? "success" : "warning"}`} role="status" aria-live="polite">
+            {ledgerCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
+            <p>
+              {ledgerCorrect
+                ? "Correct. Now the buffer ratio changes from 0.560 / 0.460 to 0.252 / 0.768."
+                : "Hint: subtract 0.308 mol from py, add 0.308 mol to pyH+, and H+ goes to zero after the reaction."}
+            </p>
+          </div>
+        )}
+        <div className="button-row">
+          <button
+            className="secondary-action"
+            disabled={ledgerCorrect}
+            onClick={onLedgerCheck}
+          >
+            Check stoichiometry
+          </button>
+          <TeacherFillButton
+            teacherMode={teacherMode}
+            inline
+            label="Autofill correct choice"
+            onFill={() => {
+              onLedgerChange("changePy", "-0.308");
+              onLedgerChange("changePyH", "0.308");
+              onLedgerChange("afterPy", "0.252");
+              onLedgerChange("afterH", "0");
+              onLedgerChange("afterPyH", "0.768");
+            }}
+          />
+        </div>
+      </div>
+
+      {ledgerCorrect && (
+        <div className="stoich-ratio-result">
+          <RatioComparison route={route} />
+        </div>
+      )}
+
+      <button
+        className="primary-action"
+        disabled={!ledgerCorrect}
+        onClick={onContinue}
+      >
+        Plan calculation <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+function CalculationPlan({
+  route,
+  dataChoice,
+  selectedSteps,
+  stepOrder,
+  orderedCorrectly,
+  stepsComplete,
+  teacherMode,
   onChooseStep,
   onFillOrder,
   onUndo,
@@ -617,12 +799,7 @@ function CalculationPath({
   stepOrder: number[];
   orderedCorrectly: boolean;
   stepsComplete: boolean;
-  ledgerValues: Record<BufferLedgerField, string>;
-  ledgerChecked: boolean;
-  ledgerCorrect: boolean;
   teacherMode: boolean;
-  onLedgerChange: (field: BufferLedgerField, value: string) => void;
-  onLedgerCheck: () => void;
   onChooseStep: (index: number) => void;
   onFillOrder: () => void;
   onUndo: () => void;
@@ -634,199 +811,105 @@ function CalculationPath({
 
   return (
     <div className="step-card">
-      <p className="eyebrow">Symbolic reasoning</p>
+      <p className="eyebrow">Calculation plan</p>
       <h3>Put the calculation moves in order.</h3>
       <p>
-        {route === "shortcut"
-          ? "Shortcut path: compare the buffer ratio before and after acid is consumed."
-          : dataChoice === "pkb"
-            ? "Long path: convert pKb to pKa, compute initial and final pH, then subtract."
-            : "Long path: compute initial and final pH with pKa, then subtract."}
+        The stoichiometry gives final amounts of <code>0.252 mol py</code> and{" "}
+        <code>0.768 mol pyH+</code>. Now decide how those amounts become a pH
+        change.
       </p>
+
+      <RatioComparison route={route} />
 
       <div className="next-step-card">
         <span>Next target</span>
-        <strong>{ledgerCorrect ? `Step ${Math.min(nextStepNumber, steps.length)}` : "ICE table"}</strong>
+        <strong>Step {Math.min(nextStepNumber, steps.length)}</strong>
         <p>
-          {ledgerCorrect
-            ? stepsComplete
-              ? "The plan is complete. Now connect the math to the particle view."
-              : expectedNext
-            : "Fill the stoichiometry table first, then the calculation moves unlock."}
+          {stepsComplete
+            ? "The plan is complete. Now connect the math to the particle view."
+            : expectedNext}
         </p>
       </div>
 
-      <div className="ledger interactive-ice" aria-label="Editable stoichiometry table">
-        <strong>py + H+ &rarr; pyH+</strong>
-        <div className="ice-given-grid" aria-label="Numbers to use in the stoichiometry table">
-          <div>
-            <span>Given py</span>
-            <code>0.560 mol</code>
-          </div>
-          <div>
-            <span>Added H+</span>
-            <code>0.308 mol</code>
-          </div>
-          <div>
-            <span>Given pyH+</span>
-            <code>0.460 mol</code>
-          </div>
-        </div>
-        <div className="ice-grid buffer-ledger-grid">
-          <span />
-          <span>py</span>
-          <span>H+</span>
-          <span>pyH+</span>
-          <FragmentedBufferRow
-            label="Initial"
-            fields={["initialPy", "initialH", "initialPyH"]}
-            values={ledgerValues}
-            checked={ledgerChecked}
-            teacherMode={teacherMode}
-            onChange={onLedgerChange}
-            onFill={(field, value) => onLedgerChange(field, value)}
-          />
-          <FragmentedBufferRow
-            label="Change"
-            fields={["changePy", "changeH", "changePyH"]}
-            values={ledgerValues}
-            checked={ledgerChecked}
-            teacherMode={teacherMode}
-            onChange={onLedgerChange}
-            onFill={(field, value) => onLedgerChange(field, value)}
-          />
-          <FragmentedBufferRow
-            label="After"
-            fields={["afterPy", "afterH", "afterPyH"]}
-            values={ledgerValues}
-            checked={ledgerChecked}
-            teacherMode={teacherMode}
-            onChange={onLedgerChange}
-            onFill={(field, value) => onLedgerChange(field, value)}
-          />
-        </div>
-        {ledgerChecked && (
-          <div className={`feedback ${ledgerCorrect ? "success" : "warning"}`} role="status" aria-live="polite">
-            {ledgerCorrect ? <Check size={18} /> : <Lightbulb size={18} />}
-            <p>
-              {ledgerCorrect
-                ? "Correct. The strong acid is fully consumed by pyridine, so the rest of the calculations can use the updated buffer amounts."
-                : "Hint: subtract 0.308 mol from py, add 0.308 mol to pyH+, and H+ goes to zero after the reaction."}
-            </p>
-          </div>
-        )}
-        <div className="button-row">
-          <button
-            className="secondary-action"
-            disabled={ledgerCorrect}
-            onClick={onLedgerCheck}
-          >
-            Check table
-          </button>
-          <TeacherFillButton
-            teacherMode={teacherMode}
-            inline
-            label="Autofill correct choice"
-            onFill={() => {
-              onLedgerChange("initialPy", "0.560");
-              onLedgerChange("initialH", "0.308");
-              onLedgerChange("initialPyH", "0.460");
-              onLedgerChange("changePy", "-0.308");
-              onLedgerChange("changeH", "-0.308");
-              onLedgerChange("changePyH", "0.308");
-              onLedgerChange("afterPy", "0.252");
-              onLedgerChange("afterH", "0");
-              onLedgerChange("afterPyH", "0.768");
-            }}
-          />
-        </div>
+      <div className="teacher-order-fill">
+        <TeacherFillButton
+          teacherMode={teacherMode}
+          inline
+          label="Autofill correct order"
+          onFill={onFillOrder}
+        />
       </div>
 
-      {ledgerCorrect && (
-        <>
-          <RatioComparison route={route} />
+      <div className="step-bank">
+        {stepOrder.map((stepIndex) => (
+          <button
+            key={steps[stepIndex]}
+            disabled={selectedSteps.includes(stepIndex)}
+            onClick={() => onChooseStep(stepIndex)}
+          >
+            {steps[stepIndex]}
+          </button>
+        ))}
+      </div>
 
-          <div className="teacher-order-fill">
-            <TeacherFillButton
-              teacherMode={teacherMode}
-              inline
-              label="Autofill correct order"
-              onFill={onFillOrder}
-            />
-          </div>
-
-          <div className="step-bank">
-            {stepOrder.map((stepIndex) => (
-              <button
-                key={steps[stepIndex]}
-                disabled={selectedSteps.includes(stepIndex)}
-                onClick={() => onChooseStep(stepIndex)}
-              >
-                {steps[stepIndex]}
-              </button>
-            ))}
-          </div>
-
-          <div className="ordered-steps">
-            {selectedSteps.length === 0 ? (
-              <p>Choose the first move.</p>
-            ) : (
-              selectedSteps.map((stepIndex, index) => (
-                <div key={`${stepIndex}-${index}`} className="ordered-step">
-                  <span>{index + 1}</span>
-                  <p>{steps[stepIndex]}</p>
-                </div>
-              ))
-            )}
-          </div>
-
-          {selectedSteps.length > 0 && !orderedCorrectly && (
-            <div className="feedback warning" role="status" aria-live="polite">
-              <Lightbulb size={18} />
-              <p>
-                Start with moles, then reaction stoichiometry. Henderson-Hasselbalch
-                comes after the buffer amounts are updated.
-              </p>
+      <div className="ordered-steps">
+        {selectedSteps.length === 0 ? (
+          <p>Choose the first move.</p>
+        ) : (
+          selectedSteps.map((stepIndex, index) => (
+            <div key={`${stepIndex}-${index}`} className="ordered-step">
+              <span>{index + 1}</span>
+              <p>{steps[stepIndex]}</p>
             </div>
-          )}
+          ))
+        )}
+      </div>
 
-          {stepsComplete && (
-            <div className="math-panel">
-              <strong>Worked values</strong>
-              <p>
-                <code>py: 0.560 - 0.308 = 0.252 mol</code>
-                <br />
-                <code>pyH+: 0.460 + 0.308 = 0.768 mol</code>
-              </p>
-              {dataChoice === "pkb" && (
-                <p>
-                  <code>pKb(py) = {pKbPyridine.toFixed(2)}</code>
-                  <br />
-                  <code>pKa(pyH+) = 14.00 - {pKbPyridine.toFixed(2)} = 5.25</code>
-                </p>
-              )}
-              {route === "shortcut" && (
-                <p>
-                  <code>
-                    delta pH = log((0.252 / 0.768) / (0.560 / 0.460)) ={" "}
-                    {deltaAnswer.toFixed(2)}
-                  </code>
-                </p>
-              )}
-              {route !== "shortcut" && (
-                <p>
-                  <code>
-                    pH_i = 5.25 + log(0.560 / 0.460) = {initialPH.toFixed(2)}
-                  </code>
-                  <br />
-                  <code>
-                    pH_f = 5.25 + log(0.252 / 0.768) = {finalPH.toFixed(2)}
-                  </code>
-                </p>
-              )}
-            </div>
+      {selectedSteps.length > 0 && !orderedCorrectly && (
+        <div className="feedback warning" role="status" aria-live="polite">
+          <Lightbulb size={18} />
+          <p>
+            Start with moles, then reaction stoichiometry. Henderson-Hasselbalch
+            comes after the buffer amounts are updated.
+          </p>
+        </div>
+      )}
+
+      {stepsComplete && (
+        <div className="math-panel">
+          <strong>Worked values</strong>
+          <p>
+            <code>py: 0.560 - 0.308 = 0.252 mol</code>
+            <br />
+            <code>pyH+: 0.460 + 0.308 = 0.768 mol</code>
+          </p>
+          {dataChoice === "pkb" && (
+            <p>
+              <code>pKb(py) = {pKbPyridine.toFixed(2)}</code>
+              <br />
+              <code>pKa(pyH+) = 14.00 - {pKbPyridine.toFixed(2)} = 5.25</code>
+            </p>
           )}
-        </>
+          {route === "shortcut" && (
+            <p>
+              <code>
+                delta pH = log((0.252 / 0.768) / (0.560 / 0.460)) ={" "}
+                {deltaAnswer.toFixed(2)}
+              </code>
+            </p>
+          )}
+          {route !== "shortcut" && (
+            <p>
+              <code>
+                pH_i = 5.25 + log(0.560 / 0.460) = {initialPH.toFixed(2)}
+              </code>
+              <br />
+              <code>
+                pH_f = 5.25 + log(0.252 / 0.768) = {finalPH.toFixed(2)}
+              </code>
+            </p>
+          )}
+        </div>
       )}
 
       <div className="button-row">
@@ -1121,22 +1204,20 @@ function MoleLedger({ revealed }: { revealed: boolean }) {
   );
 }
 
-function FragmentedBufferRow({
+function StoichInput({
+  field,
   label,
-  fields,
-  values,
+  value,
   checked,
   teacherMode,
   onChange,
-  onFill,
 }: {
+  field: BufferLedgerField;
   label: string;
-  fields: [BufferLedgerField, BufferLedgerField, BufferLedgerField];
-  values: Record<BufferLedgerField, string>;
+  value: string;
   checked: boolean;
   teacherMode: boolean;
   onChange: (field: BufferLedgerField, value: string) => void;
-  onFill: (field: BufferLedgerField, value: string) => void;
 }) {
   const teacherAnswers: Record<BufferLedgerField, string> = {
     initialPy: "0.560",
@@ -1149,45 +1230,28 @@ function FragmentedBufferRow({
     afterH: "0",
     afterPyH: "0.768",
   };
-  const placeholders: Record<BufferLedgerField, string> = {
-    initialPy: "type",
-    initialH: "type",
-    initialPyH: "type",
-    changePy: "type",
-    changeH: "type",
-    changePyH: "type",
-    afterPy: "type",
-    afterH: "type",
-    afterPyH: "type",
-  };
+  const correct = value ? bufferLedgerFieldIsCorrect(field, value) : false;
 
   return (
-    <>
+    <label className="stoich-input">
       <span>{label}</span>
-      {fields.map((field) => {
-        const parsed = Number(values[field]);
-        const correct =
-          Number.isFinite(parsed) && bufferLedgerFieldIsCorrect(field, values[field]);
-        return (
-          <div key={field} className="teacher-fill-field ice-fill-field">
-            <input
-              className={checked ? (correct ? "correct" : "incorrect") : ""}
-              value={values[field]}
-              onChange={(event) => onChange(field, event.target.value)}
-              aria-label={`${label} ${field}`}
-              placeholder={placeholders[field]}
-              inputMode="decimal"
-              autoCapitalize="none"
-              spellCheck={false}
-            />
-            <TeacherFillButton
-              teacherMode={teacherMode}
-              onFill={() => onFill(field, teacherAnswers[field])}
-            />
-          </div>
-        );
-      })}
-    </>
+      <div className="teacher-fill-field">
+        <input
+          className={checked ? (correct ? "correct" : "incorrect") : ""}
+          value={value}
+          onChange={(event) => onChange(field, event.target.value)}
+          aria-label={label}
+          placeholder="type moles"
+          inputMode="decimal"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+        <TeacherFillButton
+          teacherMode={teacherMode}
+          onFill={() => onChange(field, teacherAnswers[field])}
+        />
+      </div>
+    </label>
   );
 }
 

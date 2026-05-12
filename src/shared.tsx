@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 
 export function shuffledIndices(length: number) {
   const values = Array.from({ length }, (_, index) => index);
@@ -63,5 +63,44 @@ export function Progress({ value, label }: { value: number; label: string }) {
     >
       <span style={{ width: `${value}%` }} />
     </div>
+  );
+}
+
+export function StepBackButton({
+  disabled,
+  onBack,
+}: {
+  disabled: boolean;
+  onBack: () => void;
+}) {
+  return (
+    <button
+      className="step-back-button"
+      disabled={disabled}
+      onClick={onBack}
+      type="button"
+    >
+      <ArrowLeft size={18} />
+      Back
+    </button>
+  );
+}
+
+export function ProblemFacts({
+  title = "Problem facts",
+  facts,
+}: {
+  title?: string;
+  facts: string[];
+}) {
+  return (
+    <aside className="problem-facts" aria-label={title}>
+      <strong>{title}</strong>
+      <ul>
+        {facts.map((fact) => (
+          <li key={fact}>{fact}</li>
+        ))}
+      </ul>
+    </aside>
   );
 }

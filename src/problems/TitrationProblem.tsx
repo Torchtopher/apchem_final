@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Lightbulb, RotateCcw } from "lucide-react";
-import { Counter, Progress, TeacherFillButton } from "../shared";
+import { Counter, ProblemFacts, Progress, StepBackButton, TeacherFillButton } from "../shared";
 
 const aceticKa = 1.8e-5;
 const aceticPka = -Math.log10(aceticKa);
@@ -46,6 +46,12 @@ const titrationBaseMolarity = 0.1;
 const titrationAcidMoles = titrationAcidMolarity * titrationAcidVolumeL;
 const titrationEquivalenceVolumeL = titrationAcidMoles / titrationBaseMolarity;
 const titrationEquivalenceVolumeMl = titrationEquivalenceVolumeL * 1000;
+const titrationFacts = [
+  "25.0 mL of 0.100 M acetic acid.",
+  "Titrated with 0.100 M NaOH.",
+  "Acetic acid pKa = 4.745g",
+  "Equivalence volume: 25.0 mL.",
+];
 
 function initialWeakAcidPH(concentration: number) {
   const h =
@@ -311,12 +317,17 @@ export function TitrationProblem({ teacherMode }: { teacherMode: boolean }) {
           aria-live="polite"
           aria-label="Titration guided step"
         >
+          {phase > 0 && <ProblemFacts facts={titrationFacts} />}
+          <StepBackButton
+            disabled={phase === 0}
+            onBack={() => setPhase((current) => Math.max(0, current - 1))}
+          />
           <div className="focus-cue">
             <span aria-hidden="true">-&gt;</span>
             <p>
               {phase === 0 && "Start here: know the four required points."}
               {phase === 1 && "Drag the slider or click A-D to jump between regions."}
-              {phase === 2 && "Finish here: calculate each checkpoint."}
+              {phase === 2 && "Finish here: calculate each checkpoint. (do not just look back at the graph)"}
             </p>
           </div>
 
